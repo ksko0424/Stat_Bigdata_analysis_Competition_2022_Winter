@@ -15,36 +15,56 @@
    조사일자, 호선, 역명, 상·하선 구분, 역 주변 교통시설 여부 등을 활용해 하루 평균 혼잡도를 예측할 수 있는지 확인했습니다.
 
 2. **미세먼지 원인 분석**  
-   역사 내부 미세먼지 농도가 외부보다 높게 나타나는 원인이 정말 승객 혼잡도인지, 아니면 열차 운행 빈도와 같은 다른 요인이 더 큰 영향을 주는지 검증했습니다.
+   역사 내부 미세먼지 농도가 승객 혼잡도와 관련되는지, 또는 열차 운행 빈도와 같은 다른 요인이 더 큰 영향을 주는지 검토했습니다.
 
-핵심은 단순히 그래프의 유사성을 보고 결론을 내리지 않고, **직관적 가설을 데이터와 통계 검정으로 재검증했다는 점**입니다.
+핵심 분석 흐름은 관측 패턴에서 출발해 가설을 세우고, 역별 데이터와 통계 검정을 통해 설명 요인을 비교하는 방식입니다.
+
+![Analysis Flow](assets/figures/fig01_analysis_flow.png)
 
 ---
 
-## 2. Key Findings
+## 2. Dataset
+
+데이터는 대회 제공 CSV 3개와 운행 빈도 보조 자료를 사용했습니다.
+
+| File | Description |
+|---|---|
+| `data/raw/statjbnu1/data1.csv` | 서울교통공사 지하철 혼잡도 정보. 조사일자, 호선, 역번호, 역명, 상·하선 구분, 30분 단위 혼잡도 포함 |
+| `data/raw/statjbnu1/data2.csv` | 서울 지하철 역사 대기 정보. PM10, CO2, HCHO, CO 포함 |
+| `data/raw/statjbnu1/data3.csv` | 자치구별 지하철역 정보 |
+| `new_data4.csv` | 노선별 운행 횟수 및 수송 인원 요약 보조 자료 |
+
+자료 출처:
+
+- <https://www.data.go.kr/data/15071311/fileData.do>
+- <https://data.seoul.go.kr/dataList/OA-2732/F/1/datasetView.do>
+- <https://www.gimi9.com/dataset/www-data-go-kr-data-filedata-15081868>
+
+---
+
+## 3. Key Findings
 
 | Topic | Finding |
 |---|---|
-| 내부/외부 미세먼지 비교 | 지하철 역사 내부 PM10은 외부보다 약 2배 높게 관측됨 |
-| 시간대별 패턴 | 외부 미세먼지는 아침에 감소하는 반면, 내부 PM10은 출퇴근 시간대에 상승 |
-| 초기 가설 | 내부 PM10 상승이 승객 혼잡도 때문일 가능성을 검토 |
-| 대안 가설 | 역별 패턴이 혼잡도와 맞지 않는 사례를 확인하고, 열차 운행 빈도에 주목 |
-| 통계 검정 | 운행 빈도 차이가 있는 집단은 p-value < 0.05, 혼잡도만 차이나는 집단은 p-value = 0.11 |
-| 결론 | 역사 내 PM10은 승객 혼잡도보다 **열차 운행 빈도**와 더 관련될 가능성이 높음 |
+| 혼잡도 패턴 | 평일 평균 혼잡도는 출근·퇴근 시간대에 뚜렷한 peak를 보임 |
+| 역사 PM10 분포 | PM10은 노선별·역별 편차가 존재함 |
+| 혼잡도와 PM10 | 역 단위 평균 혼잡도만으로 PM10 차이를 설명하기에는 한계가 있음 |
+| 대안 요인 | 열차 운행 빈도는 역사 내 공기질과 함께 검토할 수 있는 주요 노선 단위 요인임 |
+| 통계 검정 | 원 프로젝트 요약 기준, 운행 빈도 차이가 있는 집단은 p-value < 0.05, 혼잡도만 차이나는 집단은 p-value = 0.11 |
 
 ---
 
-## 3. Part A — 혼잡도 예측 모델링
+## 4. Part A — 혼잡도 예측 모델링
 
-### 3.1 변수 구성
+### 4.1 변수 구성
 
 - 전체 후보 변수
-  - 조사일자: 평일/주말 여부
+  - 조사일자: 평일/토요일/일요일
   - 호선
   - 역 번호
   - 역명
-  - 구분: 상선/하선
-  - 시간별 혼잡도
+  - 구분: 상선/하선/내선/외선
+  - 시간대별 혼잡도
 - 최종 선택 변수
   - 조사일자
   - 호선
@@ -55,90 +75,79 @@
 
 선행연구인 *기계학습을 이용한 서울 지하철 승하차 인원 예측*에서 역 주변 버스터미널 여부가 승하차 수요와 혼잡도에 영향을 줄 수 있다는 내용을 참고해, 해당 정보를 파생변수로 구성했습니다.
 
-### 3.2 모델 비교
+### 4.2 시간대별 혼잡도 패턴
+
+![Average Subway Congestion by Time](assets/figures/fig02_congestion_hourly_profile.png)
+
+### 4.3 모델 비교
 
 | Model | MSE | Note |
 |---|---:|---|
 | Linear Regression | 72.105 | 기준 모델 |
 | Random Forest | 68.459 | 더 낮은 MSE로 최종 채택 |
 
-![Predicted vs Actual Congestion](https://user-images.githubusercontent.com/73769046/156136334-20e0a96b-9f90-40b1-94a1-733a98baab8c.png)
-
-- x축: 예측 혼잡도
-- y축: 실제 혼잡도
-
-제한된 데이터와 변수만으로는 성능에 한계가 있었지만, 도메인 지식을 반영한 외부 변수를 추가하면 혼잡도 예측 성능을 개선할 수 있음을 확인했습니다.
+![Model MSE Comparison](assets/figures/fig06_model_mse_comparison.png)
 
 ---
 
-## 4. Part B — 혼잡도와 미세먼지(PM10)의 관계 분석
+## 5. Part B — 혼잡도와 미세먼지(PM10)의 관계 분석
 
-### 4.1 내부/외부 미세먼지 비교
+### 5.1 노선별 역사 PM10 분포
 
-![Indoor vs Outdoor PM10](https://user-images.githubusercontent.com/73769046/156136705-3dcac9c5-93de-426c-b66b-119cb1a075a8.png)
+대회 제공 역사 대기 정보(`data2.csv`)를 사용해 노선별 PM10 분포를 비교했습니다.
 
-- 지하철 역사 내부 미세먼지는 외부보다 약 2배 높게 나타났습니다.
-- 일반적으로 미세먼지는 기온이 오르는 아침 시간대에 지표면에서 멀어지며 수치가 낮아지는 경향이 있습니다.
-- 그러나 지하철 내부 PM10은 같은 시간대에 오히려 증가하는 패턴을 보였습니다.
-- 이는 지하철 내부의 별도 요인이 미세먼지 증가에 관여할 가능성을 시사합니다.
+![PM10 by Line](assets/figures/fig03_pm10_by_line_distribution.png)
 
-### 4.2 초기 가설: 승객 혼잡도 영향
+### 5.2 역 단위 평균 혼잡도와 PM10 비교
 
-![Hourly Congestion Pattern](https://user-images.githubusercontent.com/73769046/156137317-a2ecc21f-226c-4b29-959a-407df1511dd6.png)
+`data1.csv`의 시간대별 혼잡도를 역 단위 평균 혼잡도로 요약한 뒤, `data2.csv`의 역사별 PM10과 병합했습니다.
 
-시간대별 평균 혼잡도 그래프는 내부 미세먼지 그래프와 유사한 형태를 보였습니다. 따라서 초기에는 “승객이 많을수록 역사 내부 미세먼지가 증가한다”는 가설을 세웠습니다.
+![PM10 vs Congestion](assets/figures/fig04_pm10_vs_congestion_scatter.png)
 
-그러나 여러 역의 내부 PM10 변화를 개별적으로 확인한 결과, 혼잡도 그래프와 일치하지 않는 사례가 다수 발견되었습니다. 따라서 혼잡도만으로 미세먼지 증가를 설명하기 어렵다고 판단했습니다.
+이 비교는 PM10 차이가 단순히 평균 혼잡도 하나만으로 설명되기 어렵다는 점을 확인하기 위한 탐색적 분석입니다.
 
-### 4.3 대안 가설: 열차 운행 빈도
+### 5.3 대안 요인: 열차 운행 빈도
 
-관련 연구인 *지하철 역사 미세먼지(PM10)의 확산방향과 확산속도 추정*을 참고해, 열차 운행 빈도가 역사 내 PM10 농도에 큰 영향을 줄 수 있다는 대안 가설을 설정했습니다.
+노선별 평일 운행 횟수와 노선 평균 PM10을 함께 비교했습니다.
 
-![PM10 by Frequency and Congestion](https://user-images.githubusercontent.com/73769046/156322446-ceb5ec30-a901-4701-97e2-fc39d03fffe3.png)
+![Line Frequency and PM10](assets/figures/fig05_line_frequency_pm10_overview.png)
 
-boxplot으로 집단을 비교한 결과, 혼잡도보다 열차 운행 빈도에 따라 미세먼지 농도 차이가 더 뚜렷하게 나타났습니다.
+열차 운행 빈도는 노선 단위 변수이기 때문에 역 단위 PM10과 직접적인 인과관계를 의미하지는 않습니다. 다만 혼잡도 외에도 노선 운행 구조를 함께 고려해야 함을 보여주는 보조 분석으로 사용했습니다.
 
-### 4.4 t-test 기반 유의성 검정
+### 5.4 t-test 기반 유의성 검정
 
-![T-test Results](https://user-images.githubusercontent.com/73769046/156322278-607f7c07-4997-4474-8e98-a24192214f33.png)
+원 프로젝트에서는 운행 빈도 차이와 혼잡도 차이를 분리한 집단을 비교하고 t-test를 수행했습니다.
 
 | 비교 조건 | t-test 결과 | 해석 |
 |---|---|---|
 | 운행 빈도 차이가 있는 집단 | p-value < 0.05 | PM10 차이가 통계적으로 유의함 |
 | 혼잡도만 차이가 있는 집단 | p-value = 0.11 | 통계적으로 유의하지 않음 |
 
-결론적으로, 지하철 역사 내 미세먼지 농도는 승객 혼잡도보다 **열차 운행 빈도**의 영향을 더 크게 받을 가능성이 높다는 결과를 얻었습니다.
+![Reported t-test Summary](assets/figures/fig07_reported_ttest_summary.png)
 
 ---
 
-## 5. Analysis Flow
+## 6. Reproducibility
 
-```text
-내부 PM10이 외부보다 높음
-        ↓
-출퇴근 시간대 내부 PM10 상승 관측
-        ↓
-혼잡도 그래프와 유사 → 초기 가설: 승객 혼잡도 영향
-        ↓
-역별 예외 사례 확인 → 혼잡도만으로 설명 어려움
-        ↓
-선행연구 조사 → 대안 가설: 열차 운행 빈도
-        ↓
-집단 비교 및 t-test
-        ↓
-운행 빈도 영향은 유의, 혼잡도 단독 영향은 유의하지 않음
+새 시각화는 아래 스크립트로 재생성할 수 있습니다.
+
+```bash
+python scripts/visualize_subway_pm10.py
 ```
 
----
+생성 파일:
 
-## 6. Tech Stack
-
-- Python
-- Jupyter Notebook
-- pandas / NumPy
-- scikit-learn
-- matplotlib / seaborn
-- Statistical hypothesis testing: t-test
+```text
+assets/figures/
+├── fig01_analysis_flow.png
+├── fig02_congestion_hourly_profile.png
+├── fig03_pm10_by_line_distribution.png
+├── fig04_pm10_vs_congestion_scatter.png
+├── fig05_line_frequency_pm10_overview.png
+├── fig06_model_mse_comparison.png
+├── fig07_reported_ttest_summary.png
+└── derived_station_pm10_congestion_frequency.csv
+```
 
 ---
 
@@ -146,14 +155,26 @@ boxplot으로 집단을 비교한 결과, 혼잡도보다 열차 운행 빈도�
 
 ```text
 .
-├── FINAL.ipynb          # 최종 분석 노트북
-├── train.ipynb          # 초기 학습/분석 노트북
-├── train_ML.ipynb       # 머신러닝 모델링
-├── train_ML_V2.ipynb    # 모델링 개선 버전
-├── train_Vis.ipynb      # 시각화 실험
-├── visuality.ipynb      # 시각화 분석
-├── new_data4.csv        # 전처리/분석 데이터
-├── 최종본.pdf            # 최종 발표/보고 자료
-└── 최종본.pptx           # 최종 발표 자료
+├── data/raw/statjbnu1/
+│   ├── data1.csv
+│   ├── data2.csv
+│   └── data3.csv
+├── assets/figures/
+│   ├── fig01_analysis_flow.png
+│   ├── fig02_congestion_hourly_profile.png
+│   ├── fig03_pm10_by_line_distribution.png
+│   ├── fig04_pm10_vs_congestion_scatter.png
+│   ├── fig05_line_frequency_pm10_overview.png
+│   ├── fig06_model_mse_comparison.png
+│   └── fig07_reported_ttest_summary.png
+├── scripts/visualize_subway_pm10.py
+├── FINAL.ipynb
+├── train.ipynb
+├── train_ML.ipynb
+├── train_ML_V2.ipynb
+├── train_Vis.ipynb
+├── visuality.ipynb
+├── new_data4.csv
+├── 최종본.pdf
+└── 최종본.pptx
 ```
-
