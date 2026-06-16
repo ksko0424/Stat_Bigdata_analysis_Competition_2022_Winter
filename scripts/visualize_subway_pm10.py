@@ -247,6 +247,43 @@ def fig_reported_ttest() -> None:
     savefig("fig07_reported_ttest_summary.png")
 
 
+def fig_group_comparison_design() -> None:
+    """Recreate the comparison logic used in the final PDF at a higher visual quality.
+
+    The original slides compare PM10 differences across groups separated by
+    train-operation frequency and congestion. This figure visualizes the design,
+    not a re-estimated test statistic.
+    """
+    groups = [
+        ("Baseline", "Low frequency\nLow congestion", PALETTE["gray"]),
+        ("Frequency effect", "High frequency\nLow congestion", PALETTE["teal"]),
+        ("Combined high", "High frequency\nHigh congestion", PALETTE["blue"]),
+    ]
+    fig, ax = plt.subplots(figsize=(12, 5.8))
+    ax.axis("off")
+    xs = [0.18, 0.5, 0.82]
+    for i, ((title, body, color), x) in enumerate(zip(groups, xs)):
+        rect = plt.Rectangle((x - 0.115, 0.38), 0.23, 0.31, transform=ax.transAxes,
+                             facecolor="white", edgecolor=color, linewidth=2.5)
+        ax.add_patch(rect)
+        ax.text(x, 0.62, title, transform=ax.transAxes, ha="center", va="center",
+                color=color, fontsize=13, fontweight="bold")
+        ax.text(x, 0.49, body, transform=ax.transAxes, ha="center", va="center",
+                color=PALETTE["navy"], fontsize=12)
+    ax.annotate("PM10 difference", xy=(0.39, 0.535), xytext=(0.29, 0.535), xycoords=ax.transAxes,
+                arrowprops=dict(arrowstyle="->", lw=2.2, color=PALETTE["teal"]),
+                ha="center", va="bottom", color=PALETTE["teal"], fontsize=11)
+    ax.annotate("PM10 difference", xy=(0.71, 0.535), xytext=(0.61, 0.535), xycoords=ax.transAxes,
+                arrowprops=dict(arrowstyle="->", lw=2.2, color=PALETTE["blue"]),
+                ha="center", va="bottom", color=PALETTE["blue"], fontsize=11)
+    ax.text(0.5, 0.88, "Group Comparison Design: Frequency vs. Congestion", transform=ax.transAxes,
+            ha="center", fontsize=20, fontweight="bold", color=PALETTE["navy"])
+    ax.text(0.5, 0.22,
+            "Final presentation compared groups that differ in train frequency and/or congestion,\nthen used t-tests to check whether PM10 differences were statistically significant.",
+            transform=ax.transAxes, ha="center", fontsize=12, color=PALETTE["gray"])
+    savefig("fig08_group_comparison_design.png")
+
+
 def main() -> None:
     d1, d2, d3, merged, freq_clean = load_data()
     fig_analysis_flow()
@@ -256,6 +293,7 @@ def main() -> None:
     fig_frequency_overview(merged)
     fig_model_mse()
     fig_reported_ttest()
+    fig_group_comparison_design()
 
     # Save derived table used by several figures for transparent reproducibility.
     derived = merged[["호선", "역사명", "미세먼지(PM10)", "이산화탄소(CO2)", "포름알데히드(HCHO)", "일산화탄소(CO)", "avg_congestion", "freq"]]
