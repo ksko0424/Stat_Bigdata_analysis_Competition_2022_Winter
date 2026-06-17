@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 from scipy import stats
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,7 +80,7 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame,
     d1["avg_congestion"] = d1[hour_cols].mean(axis=1)
     d1["line_num"] = d1["호선"].map(normalize_line)
 
-    d2["line_num"] = pd.to_numeric(d2["호선"], errors="coerce").astype("Int64")
+    d2["line_num"] = pd.to_numeric(d2["호선"], errors="coerce").astype("float64")
     d2["station_clean"] = d2["역사명"].astype(str).str.replace(r"\d+$", "", regex=True).str.replace(" ", "", regex=False)
 
     station_cong = d1.groupby(["line_num", "역명"], as_index=False)["avg_congestion"].mean()
@@ -105,32 +106,49 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame,
 
 
 def fig_analysis_flow() -> None:
-    fig, ax = plt.subplots(figsize=(14, 4.8))
+    """Numbered narrative flow (qualitative; no test statistics baked into the art)."""
+    fig, ax = plt.subplots(figsize=(15, 4.3))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
     ax.axis("off")
     steps = [
-        ("Observation", "Indoor station PM10\nmeasured by station"),
-        ("Initial hypothesis", "Rush-hour congestion\nmay raise PM10"),
-        ("Cross-check", "Station-level patterns\nshow exceptions"),
-        ("Alternative factor", "Train operation\nfrequency"),
-        ("Validation", "Group comparison\n+ t-test"),
+        ("1. Observation", "Indoor station PM10\nmeasured by station", PALETTE["blue"]),
+        ("2. Initial hypothesis", "Rush-hour congestion\nmay raise PM10", PALETTE["blue"]),
+        ("3. Cross-check", "Station-level patterns\nbreak the simple story", PALETTE["orange"]),
+        ("4. Alternative factor", "Train operation\nfrequency (prior work)", PALETTE["purple"]),
+        ("5. Statistical test", "Group comparison\n+ t-test", PALETTE["teal"]),
     ]
-    xs = np.linspace(0.08, 0.92, len(steps))
-    for i, ((title, body), x) in enumerate(zip(steps, xs)):
-        color = PALETTE["blue"] if i in {0, 1} else PALETTE["orange"] if i == 3 else PALETTE["teal"]
-        box = plt.Rectangle((x - 0.085, 0.36), 0.17, 0.32, transform=ax.transAxes,
-                            facecolor="white", edgecolor=color, linewidth=2.2)
-        ax.add_patch(box)
-        ax.text(x, 0.61, title, transform=ax.transAxes, ha="center", va="center",
-                color=color, fontsize=12, fontweight="bold")
-        ax.text(x, 0.47, body, transform=ax.transAxes, ha="center", va="center",
-                color=PALETTE["navy"], fontsize=11)
-        if i < len(steps) - 1:
-            ax.annotate("", xy=(xs[i + 1] - 0.1, 0.52), xytext=(x + 0.1, 0.52), xycoords=ax.transAxes,
-                        arrowprops=dict(arrowstyle="->", lw=2, color=PALETTE["gray"]))
-    ax.text(0.5, 0.9, "Subway PM10 Analysis Flow", transform=ax.transAxes,
-            ha="center", fontsize=20, fontweight="bold", color=PALETTE["navy"])
-    ax.text(0.5, 0.15, "Goal: avoid a simple correlation story; compare congestion with train-operation frequency as an alternative explanation.",
-            transform=ax.transAxes, ha="center", fontsize=12, color=PALETTE["gray"])
+    n = len(steps)
+    margin, gap = 0.012, 0.028
+    bw = (1 - 2 * margin - gap * (n - 1)) / n
+    y0, bh = 0.30, 0.46
+    centers = []
+    for i, (title, body, color) in enumerate(steps):
+        x0 = margin + i * (bw + gap)
+        cx = x0 + bw / 2
+        centers.append((x0, cx))
+        ax.add_patch(FancyBboxPatch(
+            (x0, y0), bw, bh, boxstyle="round,pad=0.006,rounding_size=0.018",
+            linewidth=2.4, edgecolor=color, facecolor="white", mutation_aspect=0.32))
+        ax.add_patch(FancyBboxPatch(
+            (x0, y0 + bh - 0.115), bw, 0.115, boxstyle="round,pad=0.006,rounding_size=0.018",
+            linewidth=0, facecolor=color, alpha=0.12, mutation_aspect=0.32))
+        ax.text(cx, y0 + bh - 0.058, title, ha="center", va="center",
+                fontsize=12.5, fontweight="bold", color=color)
+        ax.text(cx, y0 + bh * 0.40, body, ha="center", va="center",
+                fontsize=10.5, color=PALETTE["navy"], linespacing=1.45)
+    for i in range(n - 1):
+        x_end = centers[i][0] + bw
+        x_next = centers[i + 1][0]
+        ax.add_patch(FancyArrowPatch(
+            (x_end + 0.004, y0 + bh / 2), (x_next - 0.004, y0 + bh / 2),
+            arrowstyle="-|>", mutation_scale=16, lw=2.2, color=PALETTE["gray"]))
+    ax.text(0.5, 0.95, "From a Correlation-Looking Pattern to a Statistically Tested Factor",
+            ha="center", va="center", fontsize=17, fontweight="bold", color=PALETTE["navy"])
+    ax.text(0.5, 0.075,
+            "Goal: refuse a surface correlation and isolate train-operation frequency "
+            "as an alternative explanation through hypothesis testing.",
+            ha="center", va="center", fontsize=11, color=PALETTE["gray"])
     savefig("fig01_analysis_flow.png")
 
 
